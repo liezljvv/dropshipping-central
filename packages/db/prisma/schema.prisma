@@ -1,0 +1,148 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum IntegrationStatus {
+  PENDING
+  CONNECTED
+  DEGRADED
+  DISCONNECTED
+}
+
+enum OrderStatus {
+  PENDING
+  PAID
+  CANCELLED
+  RETURNED
+  FULFILLED
+}
+
+enum FulfillmentJobState {
+  PENDING
+  PROCESSING
+  SUCCEEDED
+  FAILED
+}
+
+enum WorkflowRunState {
+  QUEUED
+  RUNNING
+  SUCCEEDED
+  FAILED
+}
+
+enum ActorType {
+  SYSTEM
+  USER
+  WORKER
+}
+
+model Integration {
+  id                 String                  @id @default(cuid())
+  platform           String
+  name               String
+  status             IntegrationStatus       @default(PENDING)
+  metadata           Json?
+  lastHeartbeatAt    DateTime?
+  createdAt          DateTime                @default(now())
+  updatedAt          DateTime                @updatedAt
+  credentials        IntegrationCredential[]
+  orders             Order[]
+  fulfillmentJobs    FulfillmentJob[]
+  workflowRuns       WorkflowRun[]
+  automationPolicies AutomationPolicy[]
+
+  @@index([platform, status])
+}
+
+model IntegrationCredential {
+  id               String      @id @default(cuid())
+  integrationId    String
+  credentialType   String
+  encryptedSecret  String
+  encryptedPayload Json?
+  createdAt        DateTime    @default(now())
+  updatedAt        DateTime    @updatedAt
+  integration      Integration @relation(fields: [integrationId], references: [id], onDelete: Cascade)
+
+  @@index([integrationId, credentialType])
+}
+
+model Order {
+  id              String           @id @default(cuid())
+  externalId      String
+  integrationId   String?
+  sourcePlatform  String
+  status          OrderStatus      @default(PENDING)
+  totalAmount     Decimal          @db.Decimal(12, 2)
+  currency        String
+  rawPayload      Json?
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
+  integration     Integration?     @relation(fields: [integrationId], references: [id], onDelete: SetNull)
+  fulfillmentJobs FulfillmentJob[]
+
+  @@unique([externalId, sourcePlatform])
+  @@index([status, sourcePlatform])
+}
+
+model FulfillmentJob {
+  id                String              @id @default(cuid())
+  orderId           String
+  integrationId     String?
+  supplierReference String?
+  state             FulfillmentJobState @default(PENDING)
+  attemptCount      Int                 @default(0)
+  errorMessage      String?
+  createdAt         DateTime            @default(now())
+  updatedAt         DateTime            @updatedAt
+  integration       Integration?        @relation(fields: [integrationId], references: [id], onDelete: SetNull)
+  order             Order               @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  @@index([state, integrationId])
+}
+
+model WorkflowRun {
+  id             String           @id @default(cuid())
+  integrationId  String?
+  workflowType   String
+  state          WorkflowRunState @default(QUEUED)
+  startedAt      DateTime?
+  finishedAt     DateTime?
+  contextPayload Json?
+  createdAt      DateTime         @default(now())
+  updatedAt      DateTime         @updatedAt
+  integration    Integration?     @relation(fields: [integrationId], references: [id], onDelete: SetNull)
+
+  @@index([workflowType, state])
+}
+
+model AutomationPolicy {
+  id            String       @id @default(cuid())
+  integrationId String?
+  key           String       @unique
+  enabled       Boolean      @default(true)
+  configPayload Json?
+  createdAt     DateTime     @default(now())
+  updatedAt     DateTime     @updatedAt
+  integration   Integration? @relation(fields: [integrationId], references: [id], onDelete: SetNull)
+}
+
+model AuditEvent {
+  id         String    @id @default(cuid())
+  actorType  ActorType
+  actorId    String?
+  eventType  String
+  entityType String
+  entityId   String
+  payload    Json?
+  createdAt  DateTime  @default(now())
+
+  @@index([entityType, entityId])
+  @@index([eventType, createdAt])
+}

@@ -1,0 +1,24 @@
+{
+  "name": "@dropshipping-central/worker",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "dev": "tsx watch src/index.ts",
+    "build": "tsup src/index.ts --format esm --dts --clean",
+    "test": "vitest run --passWithNoTests",
+    "lint": "echo \"lint not configured\"",
+    "typecheck": "tsc --project tsconfig.json --noEmit"
+  },
+  "dependencies": {
+    "@dropshipping-central/config": "workspace:*",
+    "@dropshipping-central/db": "workspace:*",
+    "@dropshipping-central/domain": "workspace:*",
+    "@dropshipping-central/integrations": "workspace:*",
+    "@dropshipping-central/testkit": "workspace:*",
+    "@dropshipping-central/workflows": "workspace:*",
+    "dotenv": "^17.2.2"
+  }
+}

@@ -1,0 +1,30 @@
+{
+  "name": "@dropshipping-central/db",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "scripts": {
+    "build": "tsup src/index.ts --format esm --dts --clean",
+    "db:seed": "tsx src/seed.ts",
+    "test": "vitest run --passWithNoTests",
+    "lint": "echo \"lint not configured\"",
+    "typecheck": "tsc --project tsconfig.json --noEmit",
+    "prisma:generate": "prisma generate",
+    "prisma:migrate:dev": "prisma migrate dev",
+    "prisma:studio": "prisma studio"
+  },
+  "dependencies": {
+    "@prisma/client": "^6.16.2"
+  },
+  "devDependencies": {
+    "prisma": "^6.16.2"
+  }
+}
