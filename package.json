@@ -8,7 +8,7 @@
     "build": "corepack pnpm -r build",
     "test": "corepack pnpm -r test",
     "lint": "corepack pnpm -r lint",
-    "typecheck": "corepack pnpm -r typecheck",
+    "typecheck": "corepack pnpm build && corepack pnpm -r typecheck",
     "prisma:generate": "corepack pnpm exec prisma generate --schema packages/db/prisma/schema.prisma",
     "prisma:migrate:dev": "corepack pnpm exec prisma migrate dev --schema packages/db/prisma/schema.prisma",
     "prisma:studio": "corepack pnpm exec prisma studio --schema packages/db/prisma/schema.prisma",

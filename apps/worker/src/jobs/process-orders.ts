@@ -1,4 +1,13 @@
 import { db, type Prisma } from '@dropshipping-central/db';
+import { decideFulfillmentExecution } from '@dropshipping-central/workflows';
+
+function toWorkflowPayload(value: Prisma.JsonValue | null): Record<string, unknown> {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) {
+    return {};
+  }
+
+  return value as Record<string, unknown>;
+}
 
 export async function processOrdersJob() {
   console.log('[worker] process-orders started');
@@ -6,6 +15,9 @@ export async function processOrdersJob() {
   const pendingJobs = await db.fulfillmentJob.findMany({
     where: {
       state: 'PENDING',
+    },
+    include: {
+      order: true,
     },
     orderBy: {
       createdAt: 'asc',
@@ -20,7 +32,7 @@ export async function processOrdersJob() {
 
   for (const job of pendingJobs) {
     await db.$transaction(async (tx: Prisma.TransactionClient) => {
-      await tx.fulfillmentJob.update({
+      const processingJob = await tx.fulfillmentJob.update({
         where: { id: job.id },
         data: {
           state: 'PROCESSING',
@@ -42,32 +54,100 @@ export async function processOrdersJob() {
         },
       });
 
-      await tx.fulfillmentJob.update({
-        where: { id: job.id },
-        data: {
-          state: 'SUCCEEDED',
-          errorMessage: null,
-        },
+      const decision = decideFulfillmentExecution({
+        attemptCount: job.attemptCount,
+        rawPayload: toWorkflowPayload(job.order.rawPayload),
       });
 
-      await tx.order.update({
-        where: { id: job.orderId },
-        data: {
-          status: 'FULFILLED',
-        },
-      });
-
-      await tx.auditEvent.create({
-        data: {
-          actorType: 'WORKER',
-          eventType: 'fulfillment.job.succeeded',
-          entityType: 'FulfillmentJob',
-          entityId: job.id,
-          payload: {
-            orderId: job.orderId,
+      if (decision.nextState === 'SUCCEEDED') {
+        await tx.fulfillmentJob.update({
+          where: { id: job.id },
+          data: {
+            state: 'SUCCEEDED',
+            errorMessage: null,
           },
-        },
-      });
+        });
+
+        await tx.order.update({
+          where: { id: job.orderId },
+          data: {
+            status: 'FULFILLED',
+          },
+        });
+
+        await tx.auditEvent.create({
+          data: {
+            actorType: 'WORKER',
+            eventType: 'fulfillment.job.succeeded',
+            entityType: 'FulfillmentJob',
+            entityId: job.id,
+            payload: {
+              orderId: job.orderId,
+              attemptCount: processingJob.attemptCount,
+            },
+          },
+        });
+
+        console.log(
+          `[worker] fulfillment job ${job.id} succeeded on attempt ${processingJob.attemptCount}`,
+        );
+      }
+
+      if (decision.nextState === 'PENDING') {
+        await tx.fulfillmentJob.update({
+          where: { id: job.id },
+          data: {
+            state: 'PENDING',
+            errorMessage: decision.errorMessage,
+          },
+        });
+
+        await tx.auditEvent.create({
+          data: {
+            actorType: 'WORKER',
+            eventType: 'fulfillment.job.retry_scheduled',
+            entityType: 'FulfillmentJob',
+            entityId: job.id,
+            payload: {
+              orderId: job.orderId,
+              attemptCount: processingJob.attemptCount,
+              errorMessage: decision.errorMessage,
+            },
+          },
+        });
+
+        console.log(
+          `[worker] fulfillment job ${job.id} retry scheduled after attempt ${processingJob.attemptCount}: ${decision.errorMessage}`,
+        );
+      }
+
+      if (decision.nextState === 'FAILED') {
+        await tx.fulfillmentJob.update({
+          where: { id: job.id },
+          data: {
+            state: 'FAILED',
+            errorMessage: decision.errorMessage,
+          },
+        });
+
+        await tx.auditEvent.create({
+          data: {
+            actorType: 'WORKER',
+            eventType: 'fulfillment.job.failed',
+            entityType: 'FulfillmentJob',
+            entityId: job.id,
+            payload: {
+              orderId: job.orderId,
+              attemptCount: processingJob.attemptCount,
+              errorMessage: decision.errorMessage,
+            },
+          },
+        });
+
+        console.log(
+          `[worker] fulfillment job ${job.id} failed on attempt ${processingJob.attemptCount}: ${decision.errorMessage}`,
+        );
+      }
     });
 
     console.log(`[worker] process-orders completed fulfillment job ${job.id}`);

@@ -60,6 +60,31 @@ pnpm --filter @dropshipping-central/worker dev
 
 The worker runs placeholder interval jobs for workflow processing, integration syncing, and order processing.
 
+## Fulfillment failure simulation
+
+You can simulate fulfillment failures by sending `simulateFailure` inside `order.rawPayload` when posting to `/api/v1/orders/register-paid`.
+
+Supported values:
+
+- `once`: first execution fails transiently, the next retry succeeds
+- `always`: every execution fails transiently until the max retry count is reached, then the job fails
+- `permanent`: the job fails immediately with no retry
+
+Retry rules:
+
+- max retries: `3`
+- `attemptCount` increments on every execution attempt
+- transient failures return the job to `PENDING`
+- permanent failures, or transient failures after the retry limit, set the job to `FAILED`
+- successful execution sets the job to `SUCCEEDED` and the order to `FULFILLED`
+
+Audit events emitted by the worker:
+
+- `fulfillment.job.processing`
+- `fulfillment.job.retry_scheduled`
+- `fulfillment.job.failed`
+- `fulfillment.job.succeeded`
+
 ## Prisma client generation
 
 ```bash
@@ -92,7 +117,7 @@ pnpm db:seed
 - Fastify API with versioned routing, env validation, Prisma plugin registration, and health/integrations/orders/workflows route modules
 - Persisted paid-order registration that creates fulfillment jobs and audit events
 - Worker bootstrap with isolated job modules and interval-based scheduling
-- Worker placeholder execution that processes pending fulfillment jobs and marks orders fulfilled
+- Worker execution that processes pending fulfillment jobs with retry and failure simulation support
 - Shared config, domain schemas, integration connector contracts, workflow helpers, and test factories
 - Prisma schema for integrations, credentials, orders, fulfillment jobs, workflow runs, automation policies, and audit events
 
