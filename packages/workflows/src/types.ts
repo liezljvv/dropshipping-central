@@ -10,6 +10,7 @@ export const integrationHealthEvaluationSchema = z.object({
 
 export const fulfillmentJobCreationOptionsSchema = z.object({
   integrationId: z.string().optional(),
+  supplierIntegrationId: z.string().optional(),
   supplierReference: z.string().optional(),
 });
 

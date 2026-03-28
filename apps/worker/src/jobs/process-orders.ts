@@ -1,13 +1,6 @@
-import { db, type Prisma } from '@dropshipping-central/db';
-import { decideFulfillmentExecution } from '@dropshipping-central/workflows';
-
-function toWorkflowPayload(value: Prisma.JsonValue | null): Record<string, unknown> {
-  if (!value || typeof value !== 'object' || Array.isArray(value)) {
-    return {};
-  }
-
-  return value as Record<string, unknown>;
-}
+import { db } from '@dropshipping-central/db';
+import { decideSupplierAttemptResult, supplierOrderService } from '@dropshipping-central/integrations';
+import { buildSupplierOrderSubmission } from './supplier-order-utils.js';
 
 export async function processOrdersJob() {
   console.log('[worker] process-orders started');
@@ -18,6 +11,7 @@ export async function processOrdersJob() {
     },
     include: {
       order: true,
+      supplierIntegration: true,
     },
     orderBy: {
       createdAt: 'asc',
@@ -31,39 +25,59 @@ export async function processOrdersJob() {
   }
 
   for (const job of pendingJobs) {
-    await db.$transaction(async (tx: Prisma.TransactionClient) => {
-      const processingJob = await tx.fulfillmentJob.update({
-        where: { id: job.id },
-        data: {
-          state: 'PROCESSING',
-          attemptCount: {
-            increment: 1,
-          },
+    const processingJob = await db.fulfillmentJob.update({
+      where: { id: job.id },
+      data: {
+        state: 'PROCESSING',
+        attemptCount: {
+          increment: 1,
         },
-      });
+      },
+    });
 
-      await tx.auditEvent.create({
-        data: {
-          actorType: 'WORKER',
-          eventType: 'fulfillment.job.processing',
-          entityType: 'FulfillmentJob',
-          entityId: job.id,
-          payload: {
-            orderId: job.orderId,
-          },
+    await db.auditEvent.create({
+      data: {
+        actorType: 'WORKER',
+        eventType: 'fulfillment.job.processing',
+        entityType: 'FulfillmentJob',
+        entityId: job.id,
+        payload: {
+          orderId: job.orderId,
+          supplierIntegrationId: job.supplierIntegrationId,
         },
-      });
+      },
+    });
 
-      const decision = decideFulfillmentExecution({
-        attemptCount: job.attemptCount,
-        rawPayload: toWorkflowPayload(job.order.rawPayload),
-      });
+    const submission = buildSupplierOrderSubmission({
+      orderId: job.order.externalId,
+      supplierIntegrationId: job.supplierIntegrationId,
+      rawPayload: job.order.rawPayload,
+      totalAmount: job.order.totalAmount.toNumber(),
+      currency: job.order.currency,
+    });
+    const orderInput = {
+      ...submission,
+      metadata: {
+        ...submission.metadata,
+        previousAttempts: job.attemptCount,
+      },
+      ...(job.supplierIntegrationId ? { connectionId: job.supplierIntegrationId } : {}),
+    };
 
-      if (decision.nextState === 'SUCCEEDED') {
+    const result = await supplierOrderService.submitOrder(orderInput);
+    const next = decideSupplierAttemptResult({
+      result,
+      attemptCount: processingJob.attemptCount,
+    });
+
+    if (next.nextState === 'SUCCEEDED') {
+      await db.$transaction(async (tx) => {
         await tx.fulfillmentJob.update({
           where: { id: job.id },
           data: {
             state: 'SUCCEEDED',
+            supplierOrderId: result.supplierOrderId,
+            retryable: false,
             errorMessage: null,
           },
         });
@@ -84,21 +98,26 @@ export async function processOrdersJob() {
             payload: {
               orderId: job.orderId,
               attemptCount: processingJob.attemptCount,
+              supplierOrderId: result.supplierOrderId,
             },
           },
         });
+      });
 
-        console.log(
-          `[worker] fulfillment job ${job.id} succeeded on attempt ${processingJob.attemptCount}`,
-        );
-      }
+      console.log(
+        `[worker] fulfillment job ${job.id} succeeded on attempt ${processingJob.attemptCount}`,
+      );
+    }
 
-      if (decision.nextState === 'PENDING') {
+    if (next.nextState === 'PENDING') {
+      await db.$transaction(async (tx) => {
         await tx.fulfillmentJob.update({
           where: { id: job.id },
           data: {
             state: 'PENDING',
-            errorMessage: decision.errorMessage,
+            supplierOrderId: result.supplierOrderId,
+            retryable: next.retryable,
+            errorMessage: next.errorMessage,
           },
         });
 
@@ -111,22 +130,27 @@ export async function processOrdersJob() {
             payload: {
               orderId: job.orderId,
               attemptCount: processingJob.attemptCount,
-              errorMessage: decision.errorMessage,
+              supplierOrderId: result.supplierOrderId,
+              errorMessage: next.errorMessage,
             },
           },
         });
+      });
 
-        console.log(
-          `[worker] fulfillment job ${job.id} retry scheduled after attempt ${processingJob.attemptCount}: ${decision.errorMessage}`,
-        );
-      }
+      console.log(
+        `[worker] fulfillment job ${job.id} retry scheduled after attempt ${processingJob.attemptCount}: ${next.errorMessage}`,
+      );
+    }
 
-      if (decision.nextState === 'FAILED') {
+    if (next.nextState === 'FAILED') {
+      await db.$transaction(async (tx) => {
         await tx.fulfillmentJob.update({
           where: { id: job.id },
           data: {
             state: 'FAILED',
-            errorMessage: decision.errorMessage,
+            supplierOrderId: result.supplierOrderId,
+            retryable: next.retryable,
+            errorMessage: next.errorMessage,
           },
         });
 
@@ -139,16 +163,17 @@ export async function processOrdersJob() {
             payload: {
               orderId: job.orderId,
               attemptCount: processingJob.attemptCount,
-              errorMessage: decision.errorMessage,
+              supplierOrderId: result.supplierOrderId,
+              errorMessage: next.errorMessage,
             },
           },
         });
+      });
 
-        console.log(
-          `[worker] fulfillment job ${job.id} failed on attempt ${processingJob.attemptCount}: ${decision.errorMessage}`,
-        );
-      }
-    });
+      console.log(
+        `[worker] fulfillment job ${job.id} failed on attempt ${processingJob.attemptCount}: ${next.errorMessage}`,
+      );
+    }
 
     console.log(`[worker] process-orders completed fulfillment job ${job.id}`);
   }

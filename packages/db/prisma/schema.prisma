@@ -60,6 +60,24 @@ model Integration {
   @@index([platform, status])
 }
 
+model SupplierIntegration {
+  id                String              @id @default(cuid())
+  name              String
+  provider          String
+  status            IntegrationStatus   @default(PENDING)
+  configPayload     Json
+  capabilities      Json
+  lastCatalogSyncAt DateTime?
+  lastInventorySyncAt DateTime?
+  lastPricingSyncAt DateTime?
+  createdAt         DateTime            @default(now())
+  updatedAt         DateTime            @updatedAt
+  fulfillmentJobs   FulfillmentJob[]
+  syncRuns          SupplierSyncRun[]
+
+  @@index([provider, status])
+}
+
 model IntegrationCredential {
   id               String      @id @default(cuid())
   integrationId    String
@@ -95,16 +113,37 @@ model FulfillmentJob {
   id                String              @id @default(cuid())
   orderId           String
   integrationId     String?
+  supplierIntegrationId String?
   supplierReference String?
+  supplierOrderId   String?
   state             FulfillmentJobState @default(PENDING)
   attemptCount      Int                 @default(0)
+  retryable         Boolean             @default(false)
   errorMessage      String?
   createdAt         DateTime            @default(now())
   updatedAt         DateTime            @updatedAt
   integration       Integration?        @relation(fields: [integrationId], references: [id], onDelete: SetNull)
+  supplierIntegration SupplierIntegration? @relation(fields: [supplierIntegrationId], references: [id], onDelete: SetNull)
   order             Order               @relation(fields: [orderId], references: [id], onDelete: Cascade)
 
   @@index([state, integrationId])
+  @@index([state, supplierIntegrationId])
+}
+
+model SupplierSyncRun {
+  id                   String            @id @default(cuid())
+  supplierIntegrationId String
+  syncType             String
+  state                WorkflowRunState  @default(QUEUED)
+  itemCount            Int               @default(0)
+  errorMessage         String?
+  startedAt            DateTime?
+  finishedAt           DateTime?
+  createdAt            DateTime          @default(now())
+  updatedAt            DateTime          @updatedAt
+  supplierIntegration  SupplierIntegration @relation(fields: [supplierIntegrationId], references: [id], onDelete: Cascade)
+
+  @@index([supplierIntegrationId, syncType, state])
 }
 
 model WorkflowRun {

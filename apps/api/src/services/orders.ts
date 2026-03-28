@@ -1,5 +1,6 @@
 import { type Prisma } from '@dropshipping-central/db';
 import { db } from '@dropshipping-central/db';
+import { supplierConnectionService } from '@dropshipping-central/integrations';
 import { registerPaidOrderCommandSchema } from '@dropshipping-central/domain';
 import { createFulfillmentJobsForOrder } from '@dropshipping-central/workflows';
 
@@ -33,9 +34,12 @@ function serializeFulfillmentJob(job: {
   id: string;
   orderId: string;
   integrationId: string | null;
+  supplierIntegrationId: string | null;
   supplierReference: string | null;
+  supplierOrderId: string | null;
   state: string;
   attemptCount: number;
+  retryable: boolean;
   errorMessage: string | null;
   createdAt: Date;
   updatedAt: Date;
@@ -66,6 +70,7 @@ export async function listOrders() {
 
 export async function registerPaidOrder(input: RegisterPaidOrderInput) {
   const command = registerPaidOrderCommandSchema.parse(input);
+  const defaultSupplierConnection = await supplierConnectionService.getDefaultConnection();
 
   return db.$transaction(async (tx) => {
     const order = await tx.order.upsert({
@@ -115,14 +120,19 @@ export async function registerPaidOrder(input: RegisterPaidOrderInput) {
               totalAmount: order.totalAmount.toNumber(),
               currency: order.currency,
               rawPayload: toInputJsonValue(order.rawPayload) as Record<string, unknown>,
+            }, {
+              supplierIntegrationId: defaultSupplierConnection?.id,
             }).map((job) =>
               tx.fulfillmentJob.create({
                 data: {
                   orderId: order.id,
                   integrationId: job.integrationId ?? null,
+                  supplierIntegrationId: job.supplierIntegrationId ?? null,
                   supplierReference: job.supplierReference ?? null,
+                  supplierOrderId: job.supplierOrderId ?? null,
                   state: job.state,
                   attemptCount: job.attemptCount,
+                  retryable: job.retryable ?? false,
                   errorMessage: job.errorMessage ?? null,
                 },
               }),

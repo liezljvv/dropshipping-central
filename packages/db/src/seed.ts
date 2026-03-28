@@ -49,6 +49,100 @@ async function seed() {
     },
   });
 
+  const mockSupplierIntegration = await prisma.supplierIntegration.upsert({
+    where: { id: 'seed_supplier_mock_primary' },
+    update: {
+      name: 'Primary Mock Supplier',
+      provider: 'mock',
+      status: 'CONNECTED',
+      configPayload: {
+        provider: 'mock',
+        metadata: {
+          seeded: true,
+        },
+      },
+      capabilities: {
+        searchProducts: true,
+        getProductById: true,
+        getInventory: true,
+        getPricing: true,
+        submitOrder: true,
+        getOrderStatus: true,
+        cancelOrder: true,
+      },
+    },
+    create: {
+      id: 'seed_supplier_mock_primary',
+      name: 'Primary Mock Supplier',
+      provider: 'mock',
+      status: 'CONNECTED',
+      configPayload: {
+        provider: 'mock',
+        metadata: {
+          seeded: true,
+        },
+      },
+      capabilities: {
+        searchProducts: true,
+        getProductById: true,
+        getInventory: true,
+        getPricing: true,
+        submitOrder: true,
+        getOrderStatus: true,
+        cancelOrder: true,
+      },
+    },
+  });
+
+  await prisma.supplierIntegration.upsert({
+    where: { id: 'seed_supplier_shopify_placeholder' },
+    update: {
+      name: 'Shopify Supplier Placeholder',
+      provider: 'shopify',
+      status: 'PENDING',
+      configPayload: {
+        provider: 'shopify',
+        shopDomain: 'supplier-shop.myshopify.com',
+        apiVersion: '2025-10',
+        metadata: {
+          placeholder: true,
+        },
+      },
+      capabilities: {
+        searchProducts: true,
+        getProductById: true,
+        getInventory: true,
+        getPricing: true,
+        submitOrder: true,
+        getOrderStatus: true,
+        cancelOrder: false,
+      },
+    },
+    create: {
+      id: 'seed_supplier_shopify_placeholder',
+      name: 'Shopify Supplier Placeholder',
+      provider: 'shopify',
+      status: 'PENDING',
+      configPayload: {
+        provider: 'shopify',
+        shopDomain: 'supplier-shop.myshopify.com',
+        apiVersion: '2025-10',
+        metadata: {
+          placeholder: true,
+        },
+      },
+      capabilities: {
+        searchProducts: true,
+        getProductById: true,
+        getInventory: true,
+        getPricing: true,
+        submitOrder: true,
+        getOrderStatus: true,
+        cancelOrder: false,
+      },
+    },
+  });
+
   await prisma.automationPolicy.upsert({
     where: { key: 'order.auto_fulfillment' },
     update: {
@@ -101,16 +195,22 @@ async function seed() {
     update: {
       orderId: order.id,
       integrationId: wooIntegration.id,
+      supplierIntegrationId: mockSupplierIntegration.id,
+      supplierOrderId: null,
       state: 'PENDING',
       attemptCount: 0,
+      retryable: false,
       errorMessage: null,
     },
     create: {
       id: 'seed_fulfillment_job_1001',
       orderId: order.id,
       integrationId: wooIntegration.id,
+      supplierIntegrationId: mockSupplierIntegration.id,
+      supplierOrderId: null,
       state: 'PENDING',
       attemptCount: 0,
+      retryable: false,
       errorMessage: null,
     },
   });
@@ -123,6 +223,7 @@ async function seed() {
       entityId: shopifyIntegration.id,
       payload: {
         integrations: [shopifyIntegration.id, wooIntegration.id],
+        supplierIntegrations: [mockSupplierIntegration.id],
         orderId: order.id,
       },
     },
@@ -133,6 +234,7 @@ async function seed() {
       {
         seeded: true,
         integrations: [shopifyIntegration.id, wooIntegration.id],
+        supplierIntegrations: [mockSupplierIntegration.id],
         orderId: order.id,
       },
       null,

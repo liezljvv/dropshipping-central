@@ -15,9 +15,12 @@ export function createFulfillmentJobsForOrder(
     fulfillmentJobSchema.parse({
       orderId: order.id ?? order.externalId,
       integrationId: parsedOptions.integrationId ?? order.integrationId ?? null,
+      supplierIntegrationId: parsedOptions.supplierIntegrationId ?? null,
       supplierReference: parsedOptions.supplierReference ?? null,
+      supplierOrderId: null,
       state: 'PENDING',
       attemptCount: 0,
+      retryable: false,
       errorMessage: null,
     }),
   ];

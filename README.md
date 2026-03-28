@@ -2,6 +2,8 @@
 
 Dropshipping Central is an automation-first backend monorepo for running multi-platform dropshipping operations from one control centre. The current scope is the backend foundation only: API, worker runtime, shared domain modules, integration abstractions, workflow helpers, and the initial database schema.
 
+Supplier connector architecture and extension guidance live in [docs/supplier-integrations.md](docs/supplier-integrations.md).
+
 ## Repository structure
 
 ```text
