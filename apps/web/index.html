@@ -1,0 +1,539 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Dropshipping Central Dashboard</title>
+  <style>
+    :root {
+      color-scheme: light;
+      --bg: #f4f7fb;
+      --panel: #ffffff;
+      --panel-alt: #f8fafc;
+      --border: #d8e1ec;
+      --text: #163047;
+      --muted: #5e7287;
+      --accent: #0f766e;
+      --accent-soft: #dff7f3;
+      --danger: #b42318;
+      --shadow: 0 18px 40px rgba(15, 23, 42, 0.08);
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+      background:
+        radial-gradient(circle at top left, rgba(15, 118, 110, 0.12), transparent 28%),
+        linear-gradient(180deg, #eef5fb 0%, var(--bg) 40%, #edf2f7 100%);
+      color: var(--text);
+    }
+
+    .page {
+      max-width: 1320px;
+      margin: 0 auto;
+      padding: 32px 20px 48px;
+    }
+
+    .hero {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: space-between;
+      gap: 20px;
+      align-items: end;
+      margin-bottom: 24px;
+    }
+
+    .hero h1 {
+      margin: 0 0 8px;
+      font-size: clamp(1.8rem, 3vw, 2.6rem);
+      line-height: 1.1;
+    }
+
+    .hero p {
+      margin: 0;
+      color: var(--muted);
+      max-width: 720px;
+    }
+
+    .status-bar {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      align-items: center;
+      font-size: 0.95rem;
+      color: var(--muted);
+    }
+
+    .pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 9px 12px;
+      border-radius: 999px;
+      background: var(--panel);
+      border: 1px solid var(--border);
+      box-shadow: var(--shadow);
+    }
+
+    .dot {
+      width: 9px;
+      height: 9px;
+      border-radius: 50%;
+      background: var(--accent);
+      flex: 0 0 auto;
+    }
+
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(12, minmax(0, 1fr));
+      gap: 18px;
+    }
+
+    .card {
+      grid-column: span 12;
+      background: var(--panel);
+      border: 1px solid rgba(216, 225, 236, 0.9);
+      border-radius: 18px;
+      box-shadow: var(--shadow);
+      overflow: hidden;
+    }
+
+    .card-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 12px;
+      padding: 18px 20px 14px;
+      border-bottom: 1px solid var(--border);
+      background: linear-gradient(180deg, rgba(248, 250, 252, 0.96), rgba(255, 255, 255, 0.98));
+    }
+
+    .card-header h2 {
+      margin: 0;
+      font-size: 1.05rem;
+    }
+
+    .meta {
+      font-size: 0.88rem;
+      color: var(--muted);
+    }
+
+    .table-wrap {
+      overflow-x: auto;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      min-width: 640px;
+    }
+
+    th,
+    td {
+      padding: 13px 20px;
+      text-align: left;
+      border-bottom: 1px solid var(--border);
+      vertical-align: top;
+    }
+
+    th {
+      font-size: 0.8rem;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+      color: var(--muted);
+      background: var(--panel-alt);
+    }
+
+    td {
+      font-size: 0.95rem;
+    }
+
+    tbody tr:hover {
+      background: rgba(15, 118, 110, 0.04);
+    }
+
+    tbody tr:last-child td {
+      border-bottom: 0;
+    }
+
+    .empty,
+    .error {
+      padding: 18px 20px 22px;
+      color: var(--muted);
+    }
+
+    .error {
+      color: var(--danger);
+      background: #fff7f5;
+      border-top: 1px solid #f6d7d2;
+    }
+
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      padding: 5px 10px;
+      border-radius: 999px;
+      background: var(--accent-soft);
+      color: var(--accent);
+      font-size: 0.83rem;
+      font-weight: 600;
+      white-space: nowrap;
+    }
+
+    .tags {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+    }
+
+    .tag {
+      display: inline-flex;
+      padding: 4px 8px;
+      border-radius: 999px;
+      background: #ecf2ff;
+      color: #23406b;
+      font-size: 0.78rem;
+    }
+
+    .toolbar {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: space-between;
+      gap: 12px;
+      align-items: center;
+      margin-bottom: 18px;
+    }
+
+    .toolbar button {
+      border: 0;
+      border-radius: 12px;
+      padding: 11px 16px;
+      background: #163047;
+      color: #fff;
+      font: inherit;
+      cursor: pointer;
+    }
+
+    .toolbar button:hover {
+      background: #0f2234;
+    }
+
+    .toolbar code {
+      background: rgba(15, 23, 42, 0.06);
+      padding: 3px 7px;
+      border-radius: 8px;
+    }
+
+    @media (min-width: 900px) {
+      .card.half {
+        grid-column: span 6;
+      }
+    }
+  </style>
+</head>
+<body>
+  <main class="page">
+    <section class="hero">
+      <div>
+        <h1>Dropshipping Central</h1>
+        <p>Simple local dashboard for orders, fulfillment jobs, supplier connections, and supplier catalog data.</p>
+      </div>
+      <div class="status-bar">
+        <div class="pill"><span class="dot"></span><span id="api-base-label">API base: resolving...</span></div>
+        <div class="pill"><span id="last-updated">Last updated: not loaded</span></div>
+      </div>
+    </section>
+
+    <div class="toolbar">
+      <div>Data sources: <code>/api/v1/orders</code>, <code>/api/v1/supplier-connections</code>, <code>/api/v1/supplier-catalog/search</code></div>
+      <button id="refresh-button" type="button">Refresh</button>
+    </div>
+
+    <section class="grid">
+      <article class="card">
+        <div class="card-header">
+          <h2>Orders</h2>
+          <div class="meta" id="orders-count">Loading...</div>
+        </div>
+        <div class="table-wrap" id="orders-section"></div>
+      </article>
+
+      <article class="card">
+        <div class="card-header">
+          <h2>Fulfillment Jobs</h2>
+          <div class="meta" id="jobs-count">Loading...</div>
+        </div>
+        <div class="table-wrap" id="jobs-section"></div>
+      </article>
+
+      <article class="card half">
+        <div class="card-header">
+          <h2>Supplier Connections</h2>
+          <div class="meta" id="connections-count">Loading...</div>
+        </div>
+        <div class="table-wrap" id="connections-section"></div>
+      </article>
+
+      <article class="card half">
+        <div class="card-header">
+          <h2>Supplier Catalog</h2>
+          <div class="meta" id="catalog-count">Loading...</div>
+        </div>
+        <div class="table-wrap" id="catalog-section"></div>
+      </article>
+    </section>
+  </main>
+
+  <script>
+    const API_CANDIDATES = (() => {
+      const fromQuery = new URLSearchParams(window.location.search).get('apiBase');
+      const sameOrigin = window.location.protocol.startsWith('http') ? window.location.origin : null;
+      return [fromQuery, sameOrigin, 'http://127.0.0.1:3000'].filter(Boolean);
+    })();
+
+    const elements = {
+      apiBaseLabel: document.getElementById('api-base-label'),
+      lastUpdated: document.getElementById('last-updated'),
+      refreshButton: document.getElementById('refresh-button'),
+      ordersCount: document.getElementById('orders-count'),
+      jobsCount: document.getElementById('jobs-count'),
+      connectionsCount: document.getElementById('connections-count'),
+      catalogCount: document.getElementById('catalog-count'),
+      ordersSection: document.getElementById('orders-section'),
+      jobsSection: document.getElementById('jobs-section'),
+      connectionsSection: document.getElementById('connections-section'),
+      catalogSection: document.getElementById('catalog-section')
+    };
+
+    function setLoadingState() {
+      elements.ordersCount.textContent = 'Loading...';
+      elements.jobsCount.textContent = 'Loading...';
+      elements.connectionsCount.textContent = 'Loading...';
+      elements.catalogCount.textContent = 'Loading...';
+    }
+
+    function formatDate(value) {
+      if (!value) return '-';
+      const date = new Date(value);
+      return Number.isNaN(date.getTime()) ? String(value) : date.toLocaleString();
+    }
+
+    function formatMoney(value, currency) {
+      const amount = Number(value);
+      if (Number.isNaN(amount)) {
+        return value == null ? '-' : String(value);
+      }
+
+      try {
+        return new Intl.NumberFormat(undefined, {
+          style: 'currency',
+          currency: currency || 'USD'
+        }).format(amount);
+      } catch (_error) {
+        return amount.toFixed(2) + (currency ? ' ' + currency : '');
+      }
+    }
+
+    function escapeHtml(value) {
+      return String(value)
+        .replaceAll('&', '&amp;')
+        .replaceAll('<', '&lt;')
+        .replaceAll('>', '&gt;')
+        .replaceAll('"', '&quot;')
+        .replaceAll("'", '&#39;');
+    }
+
+    function renderError(container, message) {
+      container.innerHTML = '<div class="error">' + escapeHtml(message) + '</div>';
+    }
+
+    function renderEmpty(container, message) {
+      container.innerHTML = '<div class="empty">' + escapeHtml(message) + '</div>';
+    }
+
+    function renderTable(container, columns, rows) {
+      if (!rows.length) {
+        renderEmpty(container, 'No records returned.');
+        return;
+      }
+
+      const headers = columns.map((column) => '<th>' + escapeHtml(column.label) + '</th>').join('');
+      const body = rows.map((row) => {
+        const cells = columns.map((column) => '<td>' + column.render(row) + '</td>').join('');
+        return '<tr>' + cells + '</tr>';
+      }).join('');
+
+      container.innerHTML =
+        '<table>' +
+        '<thead><tr>' + headers + '</tr></thead>' +
+        '<tbody>' + body + '</tbody>' +
+        '</table>';
+    }
+
+    async function fetchJson(baseUrl, path) {
+      const response = await fetch(baseUrl + path, {
+        headers: { Accept: 'application/json' }
+      });
+
+      if (!response.ok) {
+        throw new Error(path + ' returned ' + response.status + ' ' + response.statusText);
+      }
+
+      return response.json();
+    }
+
+    async function resolveApiBase() {
+      let lastError = null;
+
+      for (const candidate of API_CANDIDATES) {
+        try {
+          await fetchJson(candidate, '/api/v1/health');
+          return candidate;
+        } catch (error) {
+          lastError = error;
+        }
+      }
+
+      throw lastError || new Error('Unable to reach the API.');
+    }
+
+    function flattenJobs(orders) {
+      return orders.flatMap((order) =>
+        (order.fulfillmentJobs || []).map((job) => ({
+          orderId: order.id || job.orderId,
+          state: job.state,
+          attemptCount: job.attemptCount,
+          supplierIntegrationId: job.supplierIntegrationId,
+          errorMessage: job.errorMessage
+        }))
+      );
+    }
+
+    function getFailureReason(job) {
+      if (job.state !== 'FAILED') {
+        return '-';
+      }
+
+      return job.errorMessage ? job.errorMessage : 'Unknown failure';
+    }
+
+    function getPreventiveAction(job) {
+      if (job.state !== 'FAILED') {
+        return '-';
+      }
+
+      const errorMessage = typeof job.errorMessage === 'string' ? job.errorMessage : '';
+
+      if (!errorMessage) {
+        return 'Investigate logs and add clearer failure diagnostics.';
+      }
+
+      if (errorMessage.includes('max retries reached')) {
+        return 'Investigate repeated retry failures, adjust retry thresholds if needed, and fix the underlying supplier or network issue.';
+      }
+
+      if (errorMessage.includes('Permanent fulfillment failure')) {
+        return 'Review supplier mapping and configuration, validate product/order data, and correct the root cause before retrying.';
+      }
+
+      if (errorMessage.includes('Transient fulfillment failure')) {
+        return 'Check supplier/API availability, strengthen retry and backoff settings, and monitor for repeated incidents.';
+      }
+
+      return 'Review the failure reason, identify the root cause, and update validation or integration handling to prevent recurrence.';
+    }
+
+    function renderOrders(orders) {
+      elements.ordersCount.textContent = orders.length + ' total';
+      renderTable(elements.ordersSection, [
+        { label: 'Order ID', render: (row) => '<code>' + escapeHtml(row.id || '-') + '</code>' },
+        { label: 'Status', render: (row) => '<span class="badge">' + escapeHtml(row.status || '-') + '</span>' },
+        { label: 'Total Amount', render: (row) => escapeHtml(formatMoney(row.totalAmount, row.currency)) },
+        { label: 'Source Platform', render: (row) => escapeHtml(row.sourcePlatform || '-') },
+        { label: 'Created At', render: (row) => escapeHtml(formatDate(row.createdAt)) }
+      ], orders);
+    }
+
+    function renderJobs(jobs) {
+      elements.jobsCount.textContent = jobs.length + ' total';
+      renderTable(elements.jobsSection, [
+        { label: 'Order ID', render: (row) => '<code>' + escapeHtml(row.id || row.orderId || '-') + '</code>' },
+        { label: 'State', render: (row) => '<span class="badge">' + escapeHtml(row.state || '-') + '</span>' },
+        { label: 'Attempt Count', render: (row) => escapeHtml(String(row.attemptCount ?? '-')) },
+        { label: 'Supplier Integration ID', render: (row) => '<code>' + escapeHtml(row.supplierIntegrationId || '-') + '</code>' },
+        { label: 'Failure Reason', render: (row) => escapeHtml(getFailureReason(row)) },
+        { label: 'Preventive Action', render: (row) => escapeHtml(getPreventiveAction(row)) }
+      ], jobs);
+    }
+
+    function renderConnections(connections) {
+      elements.connectionsCount.textContent = connections.length + ' total';
+      renderTable(elements.connectionsSection, [
+        { label: 'Name', render: (row) => escapeHtml(row.name || '-') },
+        { label: 'Provider', render: (row) => escapeHtml(row.provider || '-') },
+        { label: 'Status', render: (row) => '<span class="badge">' + escapeHtml(row.status || '-') + '</span>' }
+      ], connections);
+    }
+
+    function renderCatalog(items) {
+      elements.catalogCount.textContent = items.length + ' total';
+      renderTable(elements.catalogSection, [
+        { label: 'Title', render: (row) => escapeHtml(row.title || '-') },
+        { label: 'Supplier Name', render: (row) => escapeHtml(row.supplierName || '-') },
+        {
+          label: 'Tags',
+          render: (row) => {
+            const tags = Array.isArray(row.tags) ? row.tags : [];
+            if (!tags.length) return '-';
+            return '<div class="tags">' + tags.map((tag) => '<span class="tag">' + escapeHtml(tag) + '</span>').join('') + '</div>';
+          }
+        }
+      ], items);
+    }
+
+    async function loadDashboard() {
+      setLoadingState();
+
+      try {
+        const apiBase = await resolveApiBase();
+        elements.apiBaseLabel.textContent = 'API base: ' + apiBase;
+
+        const [ordersData, connectionsData, catalogData] = await Promise.all([
+          fetchJson(apiBase, '/api/v1/orders'),
+          fetchJson(apiBase, '/api/v1/supplier-connections'),
+          fetchJson(apiBase, '/api/v1/supplier-catalog/search')
+        ]);
+
+        const orders = Array.isArray(ordersData.items) ? ordersData.items : [];
+        const jobs = flattenJobs(orders);
+        const connections = Array.isArray(connectionsData.items) ? connectionsData.items : [];
+        const catalog = Array.isArray(catalogData.items) ? catalogData.items : [];
+
+        renderOrders(orders);
+        renderJobs(jobs);
+        renderConnections(connections);
+        renderCatalog(catalog);
+        elements.lastUpdated.textContent = 'Last updated: ' + new Date().toLocaleString();
+      } catch (error) {
+        const message = error instanceof Error ? error.message : 'Unknown error';
+        elements.lastUpdated.textContent = 'Last updated: failed';
+        renderError(elements.ordersSection, message);
+        renderError(elements.jobsSection, message);
+        renderError(elements.connectionsSection, message);
+        renderError(elements.catalogSection, message);
+        elements.ordersCount.textContent = 'Unavailable';
+        elements.jobsCount.textContent = 'Unavailable';
+        elements.connectionsCount.textContent = 'Unavailable';
+        elements.catalogCount.textContent = 'Unavailable';
+      }
+    }
+
+    elements.refreshButton.addEventListener('click', loadDashboard);
+    loadDashboard();
+  </script>
+</body>
+</html>
