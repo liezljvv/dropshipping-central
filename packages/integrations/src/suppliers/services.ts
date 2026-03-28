@@ -3,6 +3,7 @@ import {
   supplierOrderSubmissionSchema,
   supplierProductSearchInputSchema,
   type SupplierConnection,
+  type SupplierConnectionTestResult,
   type SupplierConnector,
   type SupplierInventory,
   type SupplierOrderResult,
@@ -15,6 +16,10 @@ import type {
   SupplierConnectionRepository,
   SupplierConnectionUpsertInput,
 } from './connection-repository.js';
+import {
+  enrichSupplierConnection,
+  testSupplierConnection,
+} from './connection-status.js';
 
 export type SupplierConnectorRegistry = {
   getConnector(provider: string): SupplierConnector;
@@ -40,26 +45,75 @@ export class SupplierConnectionService {
     private readonly registry: SupplierConnectorRegistry,
   ) {}
 
-  listConnections() {
-    return this.repository.listConnections();
+  async listConnections() {
+    const connections = await this.repository.listConnections();
+    return connections.map(enrichSupplierConnection);
   }
 
-  getConnection(connectionId: string) {
-    return this.repository.getConnectionById(connectionId);
+  async getConnection(connectionId: string) {
+    const connection = await this.repository.getConnectionById(connectionId);
+    return connection ? enrichSupplierConnection(connection) : null;
   }
 
   async getDefaultConnection() {
-    return this.repository.getDefaultConnection();
+    const connections = await this.listConnections();
+    return connections.find((item) => item.status === 'CONNECTED') ?? null;
   }
 
   async upsertConnection(input: SupplierConnectionUpsertInput) {
-    return this.repository.upsertConnection(input);
+    const connection = await this.repository.upsertConnection(input);
+    return enrichSupplierConnection(connection);
+  }
+
+  async testConnection(connectionId: string): Promise<{
+    connection: SupplierConnection;
+    test: SupplierConnectionTestResult;
+  }> {
+    const connection = await this.repository.getConnectionById(connectionId);
+
+    if (!connection) {
+      throw new Error(`Supplier connection not found: ${connectionId}`);
+    }
+
+    const test = await testSupplierConnection(connection);
+    const metadata = {
+      ...connection.config.metadata,
+      configured: test.missingFields.length === 0,
+      missingFields: test.missingFields,
+      diagnostics:
+        test.status === 'CONNECTED'
+          ? []
+          : [test.message],
+      lastError: test.status === 'CONNECTED' ? null : test.message,
+      lastConnectionTest: test,
+      credentialFields: {
+        shopDomainEnvVar: 'SHOPIFY_SUPPLIER_SHOP_DOMAIN',
+        accessTokenEnvVar: 'SHOPIFY_SUPPLIER_ACCESS_TOKEN',
+        apiVersionEnvVar: 'SHOPIFY_SUPPLIER_API_VERSION',
+      },
+    };
+    const updated = await this.repository.upsertConnection({
+      ...(connection.id ? { id: connection.id } : {}),
+      name: connection.name,
+      provider: connection.provider,
+      status: test.status,
+      config: {
+        ...connection.config,
+        metadata,
+      },
+      capabilities: connection.capabilities,
+    });
+
+    return {
+      connection: enrichSupplierConnection(updated),
+      test,
+    };
   }
 
   async resolveConnection(connectionId?: string): Promise<SupplierConnection> {
     const connection = connectionId
-      ? await this.repository.getConnectionById(connectionId)
-      : await this.repository.getDefaultConnection();
+      ? await this.getConnection(connectionId)
+      : await this.getDefaultConnection();
 
     if (!connection) {
       throw new Error(

@@ -19,7 +19,7 @@ Supplier-facing code now runs through a shared `SupplierConnector` contract in `
 - Runtime selection is provider-driven: the connection record resolves to a connector by `provider`.
 - If calling code does not pass a connection id, the default connected supplier connection is used.
 - The seeded demo environment uses the `mock` supplier connection by default.
-- A `shopify` supplier connection is scaffolded but remains a compile-safe placeholder until credentials and live API work are added.
+- A `shopify` supplier connection is scaffolded and fully wired for readiness, diagnostics, and connection testing without requiring real credentials at startup.
 
 ## Adding A New Supplier
 
@@ -33,4 +33,8 @@ Supplier-facing code now runs through a shared `SupplierConnector` contract in `
 - `mock`
   Uses local seeded data and deterministic order outcomes for demo/test flows.
 - `shopify`
-  Exposes the same interface with TODO-safe stubs for auth, product sync, inventory sync, pricing sync, and order submission.
+  Exposes the same interface with centralized config loading, readiness diagnostics, a lightweight connectivity test, a Shopify Admin API client, GraphQL product reads, REST inventory/order flows, and safe fallback behavior when credentials are missing.
+
+## Shopify Setup
+
+See [docs/shopify-supplier-setup.md](/C:/Users/Liezl/Desktop/DEVELOPMENT%20PROJECTS/Dropshipping%20Central/docs/shopify-supplier-setup.md) for the exact environment variables, test flow, activation steps, and fallback behavior.

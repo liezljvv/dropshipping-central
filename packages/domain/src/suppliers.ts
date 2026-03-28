@@ -21,7 +21,25 @@ export const supplierConnectionConfigSchema = z.object({
   apiVersion: z.string().min(1).optional(),
   accessToken: z.string().min(1).optional(),
   locationId: z.string().min(1).optional(),
+  inventoryPolicy: z.string().min(1).optional(),
   metadata: z.record(z.string(), z.unknown()).default({}),
+});
+
+export const supplierConnectionTestResultSchema = z.object({
+  checkedAt: z.iso.datetime(),
+  ok: z.boolean(),
+  status: supplierIntegrationStatusEnum,
+  message: z.string().min(1),
+  missingFields: z.array(z.string()).default([]),
+});
+
+export const supplierConnectionReadinessSchema = z.object({
+  configured: z.boolean(),
+  status: supplierIntegrationStatusEnum,
+  missingFields: z.array(z.string()).default([]),
+  diagnostics: z.array(z.string()).default([]),
+  nextStep: z.string().nullable().default(null),
+  test: supplierConnectionTestResultSchema.nullable().default(null),
 });
 
 export const supplierVariantSchema = z.object({
@@ -112,6 +130,10 @@ export const supplierConnectionSchema = z.object({
   status: supplierIntegrationStatusEnum,
   config: supplierConnectionConfigSchema,
   capabilities: supplierCapabilitySetSchema,
+  readiness: supplierConnectionReadinessSchema.optional(),
+  lastCatalogSyncAt: z.iso.datetime().nullable().optional(),
+  lastInventorySyncAt: z.iso.datetime().nullable().optional(),
+  lastPricingSyncAt: z.iso.datetime().nullable().optional(),
   createdAt: z.iso.datetime().optional(),
   updatedAt: z.iso.datetime().optional(),
 });
@@ -126,6 +148,8 @@ export type SupplierOrderSubmission = z.infer<typeof supplierOrderSubmissionSche
 export type SupplierOrderResult = z.infer<typeof supplierOrderResultSchema>;
 export type SupplierProductSearchInput = z.infer<typeof supplierProductSearchInputSchema>;
 export type SupplierConnection = z.infer<typeof supplierConnectionSchema>;
+export type SupplierConnectionReadiness = z.infer<typeof supplierConnectionReadinessSchema>;
+export type SupplierConnectionTestResult = z.infer<typeof supplierConnectionTestResultSchema>;
 
 export interface SupplierConnector {
   readonly provider: string;

@@ -222,6 +222,20 @@
       background: #0f2234;
     }
 
+    .row-action {
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 7px 10px;
+      background: var(--panel-alt);
+      color: var(--text);
+      font: inherit;
+      cursor: pointer;
+    }
+
+    .row-action:hover {
+      background: #eef6ff;
+    }
+
     .toolbar code {
       background: rgba(15, 23, 42, 0.06);
       padding: 3px 7px;
@@ -249,7 +263,7 @@
     </section>
 
     <div class="toolbar">
-      <div>Data sources: <code>/api/v1/orders</code>, <code>/api/v1/supplier-connections</code>, <code>/api/v1/supplier-catalog/search</code></div>
+      <div>Data sources: <code>/api/v1/orders</code>, <code>/api/v1/supplier-connections</code>, <code>/api/v1/supplier-connections/:id/test</code>, <code>/api/v1/supplier-catalog/search</code></div>
       <button id="refresh-button" type="button">Refresh</button>
     </div>
 
@@ -308,6 +322,7 @@
       connectionsSection: document.getElementById('connections-section'),
       catalogSection: document.getElementById('catalog-section')
     };
+    let resolvedApiBase = null;
 
     function setLoadingState() {
       elements.ordersCount.textContent = 'Loading...';
@@ -386,6 +401,19 @@
       return response.json();
     }
 
+    async function postJson(baseUrl, path) {
+      const response = await fetch(baseUrl + path, {
+        method: 'POST',
+        headers: { Accept: 'application/json' }
+      });
+
+      if (!response.ok) {
+        throw new Error(path + ' returned ' + response.status + ' ' + response.statusText);
+      }
+
+      return response.json();
+    }
+
     async function resolveApiBase() {
       let lastError = null;
 
@@ -444,7 +472,31 @@
         return 'Check supplier/API availability, strengthen retry and backoff settings, and monitor for repeated incidents.';
       }
 
+      if (errorMessage.includes('rate limit')) {
+        return 'Reduce burst traffic, allow the worker backoff to complete, and retest after Shopify rate limits clear.';
+      }
+
+      if (errorMessage.includes('rejected the supplier credentials')) {
+        return 'Replace the Shopify access token, retest the connection, and retry the fulfillment job after authentication succeeds.';
+      }
+
+      if (errorMessage.includes('not configured')) {
+        return 'Add the missing Shopify environment variables, restart the services, and run the Shopify connection test.';
+      }
+
       return 'Review the failure reason, identify the root cause, and update validation or integration handling to prevent recurrence.';
+    }
+
+    function getLastSuccessfulSync(connection) {
+      const values = [
+        connection.lastCatalogSyncAt,
+        connection.lastInventorySyncAt,
+        connection.lastPricingSyncAt
+      ].filter(Boolean).map((value) => new Date(value));
+      if (!values.length) return '-';
+
+      const latest = values.reduce((current, value) => value > current ? value : current, values[0]);
+      return formatDate(latest.toISOString());
     }
 
     function renderOrders(orders) {
@@ -475,7 +527,47 @@
       renderTable(elements.connectionsSection, [
         { label: 'Name', render: (row) => escapeHtml(row.name || '-') },
         { label: 'Provider', render: (row) => escapeHtml(row.provider || '-') },
-        { label: 'Status', render: (row) => '<span class="badge">' + escapeHtml(row.status || '-') + '</span>' }
+        { label: 'Status', render: (row) => '<span class="badge">' + escapeHtml(row.status || '-') + '</span>' },
+        { label: 'Configured', render: (row) => escapeHtml(row.readiness && row.readiness.configured ? 'Yes' : 'No') },
+        {
+          label: 'Missing Fields',
+          render: (row) => {
+            const missing = row.readiness && Array.isArray(row.readiness.missingFields) ? row.readiness.missingFields : [];
+            return missing.length ? escapeHtml(missing.join(', ')) : '-';
+          }
+        },
+        {
+          label: 'Readiness',
+          render: (row) => {
+            const diagnostics = row.readiness && Array.isArray(row.readiness.diagnostics) ? row.readiness.diagnostics : [];
+            const nextStep = row.readiness && row.readiness.nextStep ? row.readiness.nextStep : null;
+            const test = row.readiness && row.readiness.test ? row.readiness.test : null;
+            const parts = [];
+
+            if (diagnostics[0]) parts.push(escapeHtml(diagnostics[0]));
+            if (test && test.message) parts.push('Last test: ' + escapeHtml(test.message));
+            if (nextStep) parts.push('Next: ' + escapeHtml(nextStep));
+
+            return parts.length ? parts.join('<br>') : '-';
+          }
+        },
+        {
+          label: 'Last Error',
+          render: (row) => {
+            const lastError = row.config && row.config.metadata ? row.config.metadata.lastError : null;
+            return lastError ? escapeHtml(String(lastError)) : '-';
+          }
+        },
+        {
+          label: 'Last Successful Sync',
+          render: (row) => escapeHtml(getLastSuccessfulSync(row))
+        },
+        {
+          label: 'Action',
+          render: (row) => row.provider === 'shopify'
+            ? '<button class="row-action" type="button" data-test-connection="' + escapeHtml(row.id || '') + '">Test Connection</button>'
+            : '-'
+        }
       ], connections);
     }
 
@@ -500,6 +592,7 @@
 
       try {
         const apiBase = await resolveApiBase();
+        resolvedApiBase = apiBase;
         elements.apiBaseLabel.textContent = 'API base: ' + apiBase;
 
         const [ordersData, connectionsData, catalogData] = await Promise.all([
@@ -533,6 +626,28 @@
     }
 
     elements.refreshButton.addEventListener('click', loadDashboard);
+    elements.connectionsSection.addEventListener('click', async (event) => {
+      const button = event.target instanceof HTMLElement ? event.target.closest('[data-test-connection]') : null;
+      if (!button || !resolvedApiBase) return;
+
+      const connectionId = button.getAttribute('data-test-connection');
+      if (!connectionId) return;
+
+      const originalText = button.textContent;
+      button.textContent = 'Testing...';
+      button.setAttribute('disabled', 'disabled');
+
+      try {
+        await postJson(resolvedApiBase, '/api/v1/supplier-connections/' + encodeURIComponent(connectionId) + '/test');
+        await loadDashboard();
+      } catch (error) {
+        const message = error instanceof Error ? error.message : 'Unable to test supplier connection.';
+        window.alert(message);
+      } finally {
+        button.textContent = originalText || 'Test Connection';
+        button.removeAttribute('disabled');
+      }
+    });
     loadDashboard();
   </script>
 </body>

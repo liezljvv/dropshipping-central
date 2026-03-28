@@ -54,10 +54,18 @@ export async function syncSupplierCatalogJob() {
           where: { id: connection.id! },
           data: {
             lastCatalogSyncAt: new Date(),
+            configPayload: {
+              ...connection.config,
+              metadata: {
+                ...connection.config.metadata,
+                lastError: null,
+              },
+            },
           },
         });
       });
     } catch (error) {
+      const message = error instanceof Error ? error.message : 'Catalog sync failed.';
       await db.$transaction(async (tx) => {
         await markSyncRun(tx, {
           connectionId: connection.id!,
@@ -65,7 +73,20 @@ export async function syncSupplierCatalogJob() {
           state: 'FAILED',
           startedAt,
           finishedAt: new Date(),
-          errorMessage: error instanceof Error ? error.message : 'Catalog sync failed.',
+          errorMessage: message,
+        });
+
+        await tx.supplierIntegration.update({
+          where: { id: connection.id! },
+          data: {
+            configPayload: {
+              ...connection.config,
+              metadata: {
+                ...connection.config.metadata,
+                lastError: message,
+              },
+            },
+          },
         });
       });
     }

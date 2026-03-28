@@ -7,6 +7,7 @@ import type {
 import { describe, expect, it, vi } from 'vitest';
 import { mockSupplierConnector } from './mock/index.js';
 import { decideSupplierAttemptResult } from './order-attempt.js';
+import { buildSupplierConnectionReadiness } from './connection-status.js';
 import {
   type SupplierConnectionRepository,
   type SupplierConnectionUpsertInput,
@@ -17,6 +18,12 @@ import {
   SupplierConnectionService,
   SupplierOrderService,
 } from './services.js';
+import {
+  buildShopifyConnectionReadiness,
+  loadShopifySupplierConfig,
+  testShopifySupplierConnection,
+} from './shopify/config.js';
+import { shopifySupplierConnector } from './shopify/index.js';
 
 const capabilities: SupplierCapabilitySet = {
   searchProducts: true,
@@ -64,7 +71,14 @@ class InMemoryConnectionRepository implements SupplierConnectionRepository {
 
   async upsertConnection(input: SupplierConnectionUpsertInput) {
     const item = makeConnection({ ...input, id: input.id ?? 'created_mock' });
-    this.connections.push(item);
+    const index = this.connections.findIndex((connection) => connection.id === item.id);
+
+    if (index >= 0) {
+      this.connections[index] = item;
+    } else {
+      this.connections.push(item);
+    }
+
     return item;
   }
 }
@@ -152,6 +166,32 @@ describe('mockSupplierConnector', () => {
 });
 
 describe('supplier services', () => {
+  it('keeps the mock supplier as the default when Shopify is not configured', async () => {
+    const connectionService = new SupplierConnectionService(
+      new InMemoryConnectionRepository([
+        makeConnection({
+          id: 'sup_shop',
+          name: 'Shopify Supplier',
+          provider: 'shopify',
+          status: 'CONNECTED',
+          config: {
+            provider: 'shopify',
+            metadata: {},
+          },
+        }),
+        makeConnection(),
+      ]),
+      new StaticSupplierConnectorRegistry({
+        mock: mockSupplierConnector,
+        shopify: shopifySupplierConnector,
+      }),
+    );
+
+    const defaultConnection = await connectionService.getDefaultConnection();
+
+    expect(defaultConnection?.id).toBe('sup_mock');
+  });
+
   it('routes catalog reads to the resolved connector', async () => {
     const searchProducts = vi.fn().mockResolvedValue([]);
     const connector: SupplierConnector = {
@@ -238,6 +278,36 @@ describe('supplier services', () => {
     expect(submitOrder).toHaveBeenCalledTimes(1);
     expect(submitOrder.mock.calls[0]?.[0].supplierIntegrationId).toBe('sup_mock');
   });
+
+  it('does not throw when Shopify is selected but not configured', async () => {
+    const connectionService = new SupplierConnectionService(
+      new InMemoryConnectionRepository([
+        makeConnection({
+          id: 'sup_shop',
+          name: 'Shopify Supplier',
+          provider: 'shopify',
+          status: 'CONNECTED',
+          config: {
+            provider: 'shopify',
+            metadata: {},
+          },
+        }),
+      ]),
+      new StaticSupplierConnectorRegistry({
+        mock: mockSupplierConnector,
+        shopify: shopifySupplierConnector,
+      }),
+    );
+    const catalogService = new SupplierCatalogService(connectionService);
+
+    const items = await catalogService.searchProducts({
+      connectionId: 'sup_shop',
+      limit: 5,
+      tags: [],
+    });
+
+    expect(items).toEqual([]);
+  });
 });
 
 describe('retry handling', () => {
@@ -272,5 +342,85 @@ describe('retry handling', () => {
     expect(pending.nextState).toBe('PENDING');
     expect(failed.nextState).toBe('FAILED');
     expect(failed.retryable).toBe(true);
+  });
+});
+
+describe('Shopify supplier readiness', () => {
+  it('reports missing credentials as not configured', () => {
+    const state = loadShopifySupplierConfig({
+      env: {},
+    });
+
+    expect(state.configured).toBe(false);
+    expect(state.status).toBe('NOT_CONFIGURED');
+    expect(state.missingFields).toEqual([
+      'SHOPIFY_SUPPLIER_SHOP_DOMAIN',
+      'SHOPIFY_SUPPLIER_ACCESS_TOKEN',
+    ]);
+  });
+
+  it('reports invalid config as an error', () => {
+    const state = loadShopifySupplierConfig({
+      env: {
+        SHOPIFY_SUPPLIER_SHOP_DOMAIN: 'https://bad host/path',
+        SHOPIFY_SUPPLIER_ACCESS_TOKEN: 'token',
+        SHOPIFY_SUPPLIER_API_VERSION: 'latest',
+      },
+    });
+
+    expect(state.configured).toBe(false);
+    expect(state.status).toBe('ERROR');
+    expect(state.diagnostics).toHaveLength(2);
+  });
+
+  it('maps Shopify readiness onto supplier connections', () => {
+    const readiness = buildShopifyConnectionReadiness(
+      makeConnection({
+        provider: 'shopify',
+        status: 'PENDING',
+        config: {
+          provider: 'shopify',
+          metadata: {},
+        },
+      }),
+    );
+
+    expect(readiness.configured).toBe(false);
+    expect(readiness.status).toBe('NOT_CONFIGURED');
+    expect(readiness.nextStep).toContain('SHOPIFY_SUPPLIER_SHOP_DOMAIN');
+  });
+
+  it('returns auth failure when Shopify rejects the token', async () => {
+    const result = await testShopifySupplierConnection({
+      env: {
+        SHOPIFY_SUPPLIER_SHOP_DOMAIN: 'supplier-shop.myshopify.com',
+        SHOPIFY_SUPPLIER_ACCESS_TOKEN: 'bad-token',
+        SHOPIFY_SUPPLIER_API_VERSION: '2025-10',
+      },
+      fetchImpl: vi.fn().mockResolvedValue({
+        ok: false,
+        status: 401,
+      } as Response),
+    });
+
+    expect(result.ok).toBe(false);
+    expect(result.status).toBe('AUTH_FAILED');
+  });
+
+  it('enriches supplier connections with readiness details', () => {
+    const connection = makeConnection({
+      id: 'sup_shop',
+      provider: 'shopify',
+      status: 'CONNECTED',
+      config: {
+        provider: 'shopify',
+        metadata: {},
+      },
+    });
+
+    const readiness = buildSupplierConnectionReadiness(connection);
+
+    expect(readiness.configured).toBe(false);
+    expect(readiness.missingFields).toContain('SHOPIFY_SUPPLIER_ACCESS_TOKEN');
   });
 });

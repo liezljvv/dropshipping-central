@@ -59,6 +59,10 @@ async function seed() {
         provider: 'mock',
         metadata: {
           seeded: true,
+          configured: true,
+          missingFields: [],
+          diagnostics: [],
+          nextStep: null,
         },
       },
       capabilities: {
@@ -80,6 +84,10 @@ async function seed() {
         provider: 'mock',
         metadata: {
           seeded: true,
+          configured: true,
+          missingFields: [],
+          diagnostics: [],
+          nextStep: null,
         },
       },
       capabilities: {
@@ -99,13 +107,23 @@ async function seed() {
     update: {
       name: 'Shopify Supplier Placeholder',
       provider: 'shopify',
-      status: 'PENDING',
+      status: 'NOT_CONFIGURED',
       configPayload: {
         provider: 'shopify',
         shopDomain: 'supplier-shop.myshopify.com',
         apiVersion: '2025-10',
         metadata: {
           placeholder: true,
+          configured: false,
+          missingFields: ['SHOPIFY_SUPPLIER_ACCESS_TOKEN'],
+          diagnostics: ['Add Shopify supplier credentials before activating this connector.'],
+          nextStep: 'Add SHOPIFY_SUPPLIER_SHOP_DOMAIN and SHOPIFY_SUPPLIER_ACCESS_TOKEN, then run a connection test.',
+          credentialFields: {
+            shopDomainEnvVar: 'SHOPIFY_SUPPLIER_SHOP_DOMAIN',
+            accessTokenEnvVar: 'SHOPIFY_SUPPLIER_ACCESS_TOKEN',
+            apiVersionEnvVar: 'SHOPIFY_SUPPLIER_API_VERSION',
+            locationIdEnvVar: 'SHOPIFY_SUPPLIER_LOCATION_ID',
+          },
         },
       },
       capabilities: {
@@ -122,13 +140,23 @@ async function seed() {
       id: 'seed_supplier_shopify_placeholder',
       name: 'Shopify Supplier Placeholder',
       provider: 'shopify',
-      status: 'PENDING',
+      status: 'NOT_CONFIGURED',
       configPayload: {
         provider: 'shopify',
         shopDomain: 'supplier-shop.myshopify.com',
         apiVersion: '2025-10',
         metadata: {
           placeholder: true,
+          configured: false,
+          missingFields: ['SHOPIFY_SUPPLIER_ACCESS_TOKEN'],
+          diagnostics: ['Add Shopify supplier credentials before activating this connector.'],
+          nextStep: 'Add SHOPIFY_SUPPLIER_SHOP_DOMAIN and SHOPIFY_SUPPLIER_ACCESS_TOKEN, then run a connection test.',
+          credentialFields: {
+            shopDomainEnvVar: 'SHOPIFY_SUPPLIER_SHOP_DOMAIN',
+            accessTokenEnvVar: 'SHOPIFY_SUPPLIER_ACCESS_TOKEN',
+            apiVersionEnvVar: 'SHOPIFY_SUPPLIER_API_VERSION',
+            locationIdEnvVar: 'SHOPIFY_SUPPLIER_LOCATION_ID',
+          },
         },
       },
       capabilities: {

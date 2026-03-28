@@ -10,7 +10,10 @@ datasource db {
 enum IntegrationStatus {
   PENDING
   CONNECTED
+  NOT_CONFIGURED
+  AUTH_FAILED
   DEGRADED
+  ERROR
   DISCONNECTED
 }
 

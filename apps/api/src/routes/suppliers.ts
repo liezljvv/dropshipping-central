@@ -9,11 +9,37 @@ const supplierSearchQuerySchema = z.object({
   tags: z.union([z.array(z.string()), z.string()]).optional(),
 });
 
+const supplierConnectionParamsSchema = z.object({
+  connectionId: z.string().min(1),
+});
+
 export const supplierRoutes: FastifyPluginAsync = async (app) => {
   app.get('/supplier-connections', async () => {
     return {
       items: await supplierConnectionService.listConnections(),
     };
+  });
+
+  app.get('/supplier-connections/:connectionId', async (request, reply) => {
+    const params = supplierConnectionParamsSchema.parse(request.params);
+    const connection = await supplierConnectionService.getConnection(params.connectionId);
+
+    if (!connection) {
+      reply.code(404);
+      return {
+        error: 'Not Found',
+        message: `Supplier connection not found: ${params.connectionId}`,
+      };
+    }
+
+    return {
+      item: connection,
+    };
+  });
+
+  app.post('/supplier-connections/:connectionId/test', async (request) => {
+    const params = supplierConnectionParamsSchema.parse(request.params);
+    return supplierConnectionService.testConnection(params.connectionId);
   });
 
   app.get('/supplier-catalog/search', async (request) => {

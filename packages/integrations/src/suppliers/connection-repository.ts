@@ -37,6 +37,9 @@ function mapSupplierConnection(record: {
   status: SupplierConnection['status'];
   configPayload: Prisma.JsonValue;
   capabilities: Prisma.JsonValue;
+  lastCatalogSyncAt: Date | null;
+  lastInventorySyncAt: Date | null;
+  lastPricingSyncAt: Date | null;
   createdAt: Date;
   updatedAt: Date;
 }): SupplierConnection {
@@ -47,6 +50,9 @@ function mapSupplierConnection(record: {
     status: record.status,
     config: supplierConnectionConfigSchema.parse(parseJsonRecord(record.configPayload)),
     capabilities: supplierCapabilitySetSchema.parse(parseJsonRecord(record.capabilities)),
+    lastCatalogSyncAt: record.lastCatalogSyncAt?.toISOString() ?? null,
+    lastInventorySyncAt: record.lastInventorySyncAt?.toISOString() ?? null,
+    lastPricingSyncAt: record.lastPricingSyncAt?.toISOString() ?? null,
     createdAt: record.createdAt.toISOString(),
     updatedAt: record.updatedAt.toISOString(),
   });
@@ -92,14 +98,14 @@ export class PrismaSupplierConnectionRepository implements SupplierConnectionRep
       update: {
         name: input.name,
         provider: input.provider,
-        status: input.status,
+        status: input.status as never,
         configPayload: toJsonValue(input.config),
         capabilities: toJsonValue(input.capabilities),
       },
       create: {
         name: input.name,
         provider: input.provider,
-        status: input.status,
+        status: input.status as never,
         configPayload: toJsonValue(input.config),
         capabilities: toJsonValue(input.capabilities),
       },
