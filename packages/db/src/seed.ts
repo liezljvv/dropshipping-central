@@ -189,6 +189,37 @@ async function seed() {
     },
   });
 
+  const auroraLamp = await prisma.product.upsert({
+    where: { sku: 'AUR-LAMP-BLK' },
+    update: {
+      supplierIntegrationId: mockSupplierIntegration.id,
+      externalId: 'mock-prod-aurora-lamp',
+      sourcePlatform: 'shopify',
+      title: 'Aurora Lamp Black',
+      description: 'Seeded product for profitability tracking.',
+      salePrice: '149.99',
+      costPrice: '74.50',
+      currency: 'USD',
+      metadata: {
+        seeded: true,
+      },
+    },
+    create: {
+      supplierIntegrationId: mockSupplierIntegration.id,
+      externalId: 'mock-prod-aurora-lamp',
+      sourcePlatform: 'shopify',
+      sku: 'AUR-LAMP-BLK',
+      title: 'Aurora Lamp Black',
+      description: 'Seeded product for profitability tracking.',
+      salePrice: '149.99',
+      costPrice: '74.50',
+      currency: 'USD',
+      metadata: {
+        seeded: true,
+      },
+    },
+  });
+
   const order = await prisma.order.upsert({
     where: {
       externalId_sourcePlatform: {
@@ -201,6 +232,13 @@ async function seed() {
       status: 'PAID',
       totalAmount: '149.99',
       currency: 'USD',
+      subtotalRevenue: '144.99',
+      shippingRevenue: '5.00',
+      totalRevenue: '149.99',
+      totalProductCost: '74.50',
+      fulfillmentCost: '8.00',
+      transactionFee: '4.50',
+      totalCost: '87.00',
       rawPayload: {
         seeded: true,
       },
@@ -212,7 +250,37 @@ async function seed() {
       status: 'PAID',
       totalAmount: '149.99',
       currency: 'USD',
+      subtotalRevenue: '144.99',
+      shippingRevenue: '5.00',
+      totalRevenue: '149.99',
+      totalProductCost: '74.50',
+      fulfillmentCost: '8.00',
+      transactionFee: '4.50',
+      totalCost: '87.00',
       rawPayload: {
+        seeded: true,
+      },
+    },
+  });
+
+  await prisma.orderLineItem.deleteMany({
+    where: {
+      orderId: order.id,
+    },
+  });
+
+  await prisma.orderLineItem.create({
+    data: {
+      orderId: order.id,
+      productId: auroraLamp.id,
+      externalId: auroraLamp.externalId,
+      sku: auroraLamp.sku,
+      title: auroraLamp.title,
+      quantity: 1,
+      unitSalePrice: '144.99',
+      unitCostPrice: '74.50',
+      currency: 'USD',
+      metadata: {
         seeded: true,
       },
     },
@@ -252,6 +320,7 @@ async function seed() {
       payload: {
         integrations: [shopifyIntegration.id, wooIntegration.id],
         supplierIntegrations: [mockSupplierIntegration.id],
+        productId: auroraLamp.id,
         orderId: order.id,
       },
     },
@@ -263,6 +332,7 @@ async function seed() {
         seeded: true,
         integrations: [shopifyIntegration.id, wooIntegration.id],
         supplierIntegrations: [mockSupplierIntegration.id],
+        productId: auroraLamp.id,
         orderId: order.id,
       },
       null,

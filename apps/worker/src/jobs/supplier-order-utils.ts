@@ -15,11 +15,26 @@ export function buildSupplierOrderSubmission(input: {
   rawPayload: Prisma.JsonValue | null;
   totalAmount: number;
   currency: string;
+  lineItems?: Array<{
+    sku: string;
+    quantity: number;
+    unitSalePrice: number;
+    currency: string;
+    externalId?: string | null;
+  }>;
 }): SupplierOrderSubmission {
   const rawPayload = toWorkflowPayload(input.rawPayload);
   const sourceLines = Array.isArray(rawPayload.supplierLines) ? rawPayload.supplierLines : [];
   const lines =
-    sourceLines.length > 0
+    input.lineItems && input.lineItems.length > 0
+      ? input.lineItems.map((line, index) => ({
+          variantId: String(line.externalId ?? `mock-var-${index + 1}`),
+          sku: line.sku,
+          quantity: line.quantity,
+          unitPrice: line.unitSalePrice,
+          currency: line.currency,
+        }))
+      : sourceLines.length > 0
       ? sourceLines.map((line, index) => {
           const payload = typeof line === 'object' && line ? (line as Record<string, unknown>) : {};
           return {

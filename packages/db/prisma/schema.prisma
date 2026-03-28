@@ -45,6 +45,22 @@ enum ActorType {
   WORKER
 }
 
+enum ProfitabilityAlertSeverity {
+  info
+  warning
+  critical
+}
+
+enum ProfitabilityAlertStatus {
+  ACTIVE
+  RESOLVED
+}
+
+enum ProfitabilityAlertEntityType {
+  PRODUCT
+  ORDER
+}
+
 model Integration {
   id                 String                  @id @default(cuid())
   platform           String
@@ -76,6 +92,7 @@ model SupplierIntegration {
   createdAt         DateTime            @default(now())
   updatedAt         DateTime            @updatedAt
   fulfillmentJobs   FulfillmentJob[]
+  products          Product[]
   syncRuns          SupplierSyncRun[]
 
   @@index([provider, status])
@@ -95,21 +112,71 @@ model IntegrationCredential {
 }
 
 model Order {
-  id              String           @id @default(cuid())
-  externalId      String
-  integrationId   String?
-  sourcePlatform  String
-  status          OrderStatus      @default(PENDING)
-  totalAmount     Decimal          @db.Decimal(12, 2)
-  currency        String
-  rawPayload      Json?
-  createdAt       DateTime         @default(now())
-  updatedAt       DateTime         @updatedAt
-  integration     Integration?     @relation(fields: [integrationId], references: [id], onDelete: SetNull)
-  fulfillmentJobs FulfillmentJob[]
+  id               String           @id @default(cuid())
+  externalId       String
+  integrationId    String?
+  sourcePlatform   String
+  status           OrderStatus      @default(PENDING)
+  totalAmount      Decimal          @db.Decimal(12, 2)
+  currency         String
+  subtotalRevenue  Decimal          @default(0) @db.Decimal(12, 2)
+  shippingRevenue  Decimal          @default(0) @db.Decimal(12, 2)
+  totalRevenue     Decimal          @default(0) @db.Decimal(12, 2)
+  totalProductCost Decimal?         @db.Decimal(12, 2)
+  fulfillmentCost  Decimal?         @db.Decimal(12, 2)
+  transactionFee   Decimal?         @db.Decimal(12, 2)
+  totalCost        Decimal?         @db.Decimal(12, 2)
+  rawPayload       Json?
+  createdAt        DateTime         @default(now())
+  updatedAt        DateTime         @updatedAt
+  integration      Integration?     @relation(fields: [integrationId], references: [id], onDelete: SetNull)
+  fulfillmentJobs  FulfillmentJob[]
+  lineItems        OrderLineItem[]
 
   @@unique([externalId, sourcePlatform])
   @@index([status, sourcePlatform])
+}
+
+model Product {
+  id                    String               @id @default(cuid())
+  supplierIntegrationId String?
+  externalId            String?
+  sourcePlatform        String?
+  sku                   String               @unique
+  title                 String
+  description           String?
+  salePrice             Decimal              @db.Decimal(12, 2)
+  costPrice             Decimal?             @db.Decimal(12, 2)
+  currency              String
+  metadata              Json?
+  createdAt             DateTime             @default(now())
+  updatedAt             DateTime             @updatedAt
+  lineItems             OrderLineItem[]
+  supplierIntegration   SupplierIntegration? @relation(fields: [supplierIntegrationId], references: [id], onDelete: SetNull)
+
+  @@index([sourcePlatform, externalId])
+  @@index([supplierIntegrationId, updatedAt])
+}
+
+model OrderLineItem {
+  id            String   @id @default(cuid())
+  orderId       String
+  productId     String?
+  externalId    String?
+  sku           String
+  title         String
+  quantity      Int
+  unitSalePrice Decimal  @db.Decimal(12, 2)
+  unitCostPrice Decimal? @db.Decimal(12, 2)
+  currency      String
+  metadata      Json?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  order         Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  product       Product? @relation(fields: [productId], references: [id], onDelete: SetNull)
+
+  @@index([orderId, sku])
+  @@index([productId])
 }
 
 model FulfillmentJob {
@@ -187,4 +254,24 @@ model AuditEvent {
 
   @@index([entityType, entityId])
   @@index([eventType, createdAt])
+}
+
+model ProfitabilityAlert {
+  id              String                       @id @default(cuid())
+  entityType      ProfitabilityAlertEntityType
+  entityId        String
+  ruleCode        String
+  ruleName        String
+  severity        ProfitabilityAlertSeverity
+  status          ProfitabilityAlertStatus    @default(ACTIVE)
+  message         String
+  metrics         Json
+  firstDetectedAt DateTime                     @default(now())
+  lastEvaluatedAt DateTime                     @default(now())
+  resolvedAt      DateTime?
+  createdAt       DateTime                     @default(now())
+  updatedAt       DateTime                     @updatedAt
+
+  @@unique([entityType, entityId, ruleCode])
+  @@index([status, severity, entityType])
 }

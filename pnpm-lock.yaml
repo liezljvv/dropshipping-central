@@ -123,6 +123,12 @@ importers:
 
   packages/workflows:
     dependencies:
+      '@dropshipping-central/config':
+        specifier: workspace:*
+        version: link:../config
+      '@dropshipping-central/db':
+        specifier: workspace:*
+        version: link:../db
       '@dropshipping-central/domain':
         specifier: workspace:*
         version: link:../domain

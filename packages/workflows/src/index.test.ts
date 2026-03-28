@@ -13,6 +13,8 @@ describe('createFulfillmentJobsForOrder', () => {
       status: 'PAID',
       totalAmount: 25,
       currency: 'USD',
+      shippingRevenue: 0,
+      lineItems: [],
       rawPayload: {},
     });
 

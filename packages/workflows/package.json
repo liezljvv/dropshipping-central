@@ -18,6 +18,8 @@
     "typecheck": "tsc --project tsconfig.json --noEmit"
   },
   "dependencies": {
+    "@dropshipping-central/config": "workspace:*",
+    "@dropshipping-central/db": "workspace:*",
     "@dropshipping-central/domain": "workspace:*",
     "zod": "^4.1.5"
   }

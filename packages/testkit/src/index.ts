@@ -20,6 +20,8 @@ export function makeOrder(overrides: Partial<Order> = {}): Order {
     status: 'PAID',
     totalAmount: 99.99,
     currency: 'USD',
+    shippingRevenue: 0,
+    lineItems: [],
     rawPayload: {},
     ...overrides,
   };

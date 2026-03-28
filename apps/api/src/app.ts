@@ -8,6 +8,8 @@ import { registerPrisma } from './plugins/prisma.js';
 import { healthRoutes } from './routes/health.js';
 import { integrationRoutes } from './routes/integrations.js';
 import { orderRoutes } from './routes/orders.js';
+import { profitabilityAlertRoutes } from './routes/profitability-alerts.js';
+import { productRoutes } from './routes/products.js';
 import { supplierRoutes } from './routes/suppliers.js';
 import { workflowRoutes } from './routes/workflows.js';
 
@@ -41,6 +43,8 @@ export function createApp(_env: ApiEnv) {
       api.register(healthRoutes);
       api.register(integrationRoutes);
       api.register(orderRoutes);
+      api.register(profitabilityAlertRoutes);
+      api.register(productRoutes);
       api.register(supplierRoutes);
       api.register(workflowRoutes);
     },

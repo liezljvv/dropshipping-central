@@ -1,5 +1,6 @@
 import { db } from '@dropshipping-central/db';
 import { decideSupplierAttemptResult, supplierOrderService } from '@dropshipping-central/integrations';
+import { evaluateAndPersistOrderProfitabilityAlerts } from '@dropshipping-central/workflows';
 import { buildSupplierOrderSubmission } from './supplier-order-utils.js';
 
 export async function processOrdersJob() {
@@ -10,7 +11,11 @@ export async function processOrdersJob() {
       state: 'PENDING',
     },
     include: {
-      order: true,
+      order: {
+        include: {
+          lineItems: true,
+        },
+      },
       supplierIntegration: true,
     },
     orderBy: {
@@ -54,6 +59,13 @@ export async function processOrdersJob() {
       rawPayload: job.order.rawPayload,
       totalAmount: job.order.totalAmount.toNumber(),
       currency: job.order.currency,
+      lineItems: job.order.lineItems.map((lineItem) => ({
+        sku: lineItem.sku,
+        quantity: lineItem.quantity,
+        unitSalePrice: lineItem.unitSalePrice.toNumber(),
+        currency: lineItem.currency,
+        externalId: lineItem.externalId,
+      })),
     });
     const orderInput = {
       ...submission,
@@ -86,6 +98,53 @@ export async function processOrdersJob() {
           where: { id: job.orderId },
           data: {
             status: 'FULFILLED',
+          },
+        });
+
+        const updatedOrder = await tx.order.findUniqueOrThrow({
+          where: { id: job.orderId },
+          include: {
+            lineItems: true,
+          },
+        });
+
+        await evaluateAndPersistOrderProfitabilityAlerts({
+          tx,
+          actorType: 'WORKER',
+          order: {
+            id: updatedOrder.id,
+            externalId: updatedOrder.externalId,
+            integrationId: updatedOrder.integrationId,
+            sourcePlatform: updatedOrder.sourcePlatform,
+            status: updatedOrder.status,
+            totalAmount: updatedOrder.totalAmount.toNumber(),
+            currency: updatedOrder.currency,
+            shippingRevenue: updatedOrder.shippingRevenue.toNumber(),
+            fulfillmentCost: updatedOrder.fulfillmentCost?.toNumber() ?? null,
+            transactionFee: updatedOrder.transactionFee?.toNumber() ?? null,
+            lineItems: updatedOrder.lineItems.map((lineItem) => ({
+              id: lineItem.id,
+              productId: lineItem.productId,
+              externalId: lineItem.externalId,
+              sku: lineItem.sku,
+              title: lineItem.title,
+              quantity: lineItem.quantity,
+              unitSalePrice: lineItem.unitSalePrice.toNumber(),
+              unitCostPrice: lineItem.unitCostPrice?.toNumber() ?? null,
+              currency: lineItem.currency,
+              metadata:
+                lineItem.metadata && typeof lineItem.metadata === 'object' && !Array.isArray(lineItem.metadata)
+                  ? (lineItem.metadata as Record<string, unknown>)
+                  : {},
+              createdAt: lineItem.createdAt.toISOString(),
+              updatedAt: lineItem.updatedAt.toISOString(),
+            })),
+            rawPayload:
+              updatedOrder.rawPayload && typeof updatedOrder.rawPayload === 'object' && !Array.isArray(updatedOrder.rawPayload)
+                ? (updatedOrder.rawPayload as Record<string, unknown>)
+                : {},
+            createdAt: updatedOrder.createdAt.toISOString(),
+            updatedAt: updatedOrder.updatedAt.toISOString(),
           },
         });
 
